@@ -27,16 +27,17 @@ wss.on('connection', (ws: WebSocket) => {
       }
       const newUser = new Users(connectionData.data.id, connectionData.data.username, ws);
       activeConnections.set(connectionData.data.id, newUser);
-    } else if (parsedMessage.type === 'SPAWNNER') {
+
+
+    } else if (parsedMessage.type === 'SPAWNER_AUTH') {
 
       const payload = SpawnerConnectionPayloadSchema.safeParse(parsedMessage.payload);
-
       if (payload.error) {
         sendMessage("ERROR", "Invalid spawner data", ws);
         return;
       }
 
-      if (!payload.data.authCode.trim()) {
+      if (!payload.data.authToken.trim()) {
         sendMessage("ERROR", "Missing auth code", ws);
         return;
       }
@@ -53,11 +54,11 @@ wss.on('connection', (ws: WebSocket) => {
       const newSpawner = new Spawner(user.id, ws);
       activeSpawnersConnections.set(user.id, newSpawner);
 
-      sendMessage("SPAWNNER", "Spawner connected successfully", ws);
+      sendMessage("SPAWNER_AUTH_SUCCESS", "Spawner connected successfully", ws);
     } else if (parsedMessage.type === 'CONFIGURATION') {
 
       const {data, error} = ConfigurationDataSchema.safeParse(parsedMessage.payload) ;
-     
+      console.log(data)
       if (error) {
         sendMessage("ERROR", "Invalid configuration data", ws);
         return;
@@ -71,9 +72,9 @@ wss.on('connection', (ws: WebSocket) => {
       spawner.setConfigurationData(data);
 
       const generatedUser = JSON.parse(await generateResponse(JSON.stringify(data)));
-
       if(generatedUser.action === "users_generated"){
-        sendMessage("CONFIGURATION", "Users generated successfully", spawner.socket);
+        data.virtualUsersPayload = generatedUser.users;
+        sendMessage("CONFIGURATION", data, spawner.socket);
       }
     }
 
@@ -81,7 +82,8 @@ wss.on('connection', (ws: WebSocket) => {
 
   };
 
-  ws.onclose = () => {
+  ws.onclose = (data) => {
+    console.log(data)
     console.log('Client disconnected');
   };
 
@@ -94,8 +96,8 @@ wss.on('connection', (ws: WebSocket) => {
 });
 
 
-function sendMessage(type:MessageStates,message: string,ws:WebSocket) {
-  const messageString = JSON.stringify({ type, payload: { message } });
+function sendMessage(type:MessageStates,message: any,ws:WebSocket) {
+  const messageString = JSON.stringify({ type, payload: message });
   ws.send(messageString);
 }
 

@@ -1,8 +1,11 @@
 {
-  "name": "types",
+  "name": "@repo/types",
   "module": "index.ts",
   "type": "module",
   "private": true,
+  "exports": {
+    "./WebsocketTypes":"./index.ts"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },

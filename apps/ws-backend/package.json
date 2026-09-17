@@ -4,9 +4,9 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "build":"bun build ./index.ts --outdir ./dist",
+    "build": "bun build ./index.ts --outdir ./dist",
     "start": "bun run ./index.ts",
-    "dev":"bun run build && bun run start"
+    "dev": "bun run build && bun run start"
   },
   "devDependencies": {
     "@types/bun": "latest"
@@ -15,8 +15,9 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@repo/types": "*",
     "@types/ws": "^8.18.1",
-    "ws": "^8.21.3",
-    "@repo/types": "*"
+    "ollama": "^0.6.3",
+    "ws": "^8.21.3"
   }
 }

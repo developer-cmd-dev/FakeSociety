@@ -1,8 +1,9 @@
 import { WebSocketServer } from 'ws';
 
-import { type WebSocketMessage, type ConfigurationData, ConnectionPayloadSchema, SpawnerConnectionPayloadSchema, ConfigurationDataSchema } from '@repo/types/WebsocketTypes';
+import { type WebSocketMessage, type ConfigurationData, ConnectionPayloadSchema, SpawnerConnectionPayloadSchema, ConfigurationDataSchema, type MessageStates } from '@repo/types/WebsocketTypes';
 import { Users } from './src/Users';
 import { Spawner } from './src/Spawner';
+import { generateResponse } from './src/agent/ollama';
 const port = process.env.PORT as string || 8080;
 
 const wss = new WebSocketServer({ port: 8080 });
@@ -10,18 +11,18 @@ const activeConnections = new Map<string, Users>();
 const activeSpawnersConnections = new Map<string, Spawner>();
 wss.on('connection', (ws: WebSocket) => {
 
-  ws.onmessage = (event) => {
+  ws.onmessage = async (event) => {
     const parsedMessage: WebSocketMessage = JSON.parse(event.data.toString());
 
     if (parsedMessage.type === 'CONNECTION') {
       const connectionData = ConnectionPayloadSchema.safeParse(parsedMessage.payload);
       if (connectionData.error) {
-        ws.send(JSON.stringify({ type: "ERROR", payload: { message: "Invalid connection data" } }));
+        sendMessage("ERROR", "Invalid connection data", ws);
         return;
       }
 
       if (activeConnections.has(connectionData.data.id)) {
-        ws.send(JSON.stringify({ type: "ERROR", payload: { message: "User already connected" } }));
+        sendMessage("ERROR", "User already connected", ws);
         return;
       }
       const newUser = new Users(connectionData.data.id, connectionData.data.username, ws);
@@ -31,12 +32,12 @@ wss.on('connection', (ws: WebSocket) => {
       const payload = SpawnerConnectionPayloadSchema.safeParse(parsedMessage.payload);
 
       if (payload.error) {
-        ws.send(JSON.stringify({ type: "ERROR", payload: { message: "Invalid spawner data " } }));
+        sendMessage("ERROR", "Invalid spawner data", ws);
         return;
       }
 
       if (!payload.data.authCode.trim()) {
-        ws.send(JSON.stringify({ type: "ERROR", payload: { message: "Missing auth code" } }));
+        sendMessage("ERROR", "Missing auth code", ws);
         return;
       }
 
@@ -45,34 +46,35 @@ wss.on('connection', (ws: WebSocket) => {
       const user = { name: "John Doe", id: "12345" }; // Replace with actual user data from the HTTP server
 
       if (!user) {
-        ws.send(JSON.stringify({ type: "ERROR", payload: { message: "Invalid auth code" } }));
+        sendMessage("ERROR", "Invalid auth code", ws);
         return;
       }
 
       const newSpawner = new Spawner(user.id, ws);
       activeSpawnersConnections.set(user.id, newSpawner);
 
-      ws.send(JSON.stringify({ type: "SPAWNNER", payload: { message: "Spawner connected successfully" } }));
+      sendMessage("SPAWNNER", "Spawner connected successfully", ws);
     } else if (parsedMessage.type === 'CONFIGURATION') {
 
       const {data, error} = ConfigurationDataSchema.safeParse(parsedMessage.payload) ;
      
       if (error) {
-        ws.send(JSON.stringify({ type: "ERROR", payload: { message: "Invalid configuration data" } }));
+        sendMessage("ERROR", "Invalid configuration data", ws);
         return;
       }
 
       const spawner = activeSpawnersConnections.get(data.userId);
       if (!spawner) {
-        ws.send(JSON.stringify({ type: "ERROR", payload: { message: "Spawner not found" } }));
+        sendMessage("ERROR", "Spawner not found", ws);
         return;
       }
       spawner.setConfigurationData(data);
 
-      
+      const generatedUser = JSON.parse(await generateResponse(JSON.stringify(data)));
 
-
-
+      if(generatedUser.action === "users_generated"){
+        sendMessage("CONFIGURATION", "Users generated successfully", spawner.socket);
+      }
     }
 
 
@@ -90,5 +92,12 @@ wss.on('connection', (ws: WebSocket) => {
 
 
 });
+
+
+function sendMessage(type:MessageStates,message: string,ws:WebSocket) {
+  const messageString = JSON.stringify({ type, payload: { message } });
+  ws.send(messageString);
+}
+
 
 console.log(`WebSocket server is running on ws://localhost:${port}`);

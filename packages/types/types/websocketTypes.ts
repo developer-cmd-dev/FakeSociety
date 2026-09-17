@@ -3,10 +3,11 @@ interface WebSocketMessage<T=any> {
     payload:T;
 }
 
-type CofingurationData = {
+type ConfigurationData   = {
     websocketConnectionUrl:string;
     usersCount:number;
     typeSchema?:object|any;
+    userId:string;
 }
 
-export { type WebSocketMessage, type CofingurationData };
+export { type WebSocketMessage,type ConfigurationData  };
